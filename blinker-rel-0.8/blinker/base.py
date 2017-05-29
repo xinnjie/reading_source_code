@@ -85,16 +85,20 @@ class Signal(object):
                 sender_ref.sender_id = sender_id
             except TypeError:
                 pass
-            # 第一次碰到 try-except中的else。这个else对应于没有exception抛出的情况
+            # 第一次碰到 try-except中的else。这个else对应于 没有exception抛出的情况 要执行的内容
             else:
                 self._weak_senders.setdefault(sender_id, sender_ref)
                 del sender_ref
 
         # broadcast this connection.  if receivers raise, disconnect.
+        # todo receiver_connected 的作用？
+        # 每次对任意一个Signal（当然receriver_connected Signal除外）,
+        #  都会触发receiver_connected信号，我们可以对receiver_connected 信号进行订阅，做一些有用的事情，比如记录每次信号触发的信息
         if receiver_connected.receivers and self is not receiver_connected:
+            # 判断 self is not receiver_connected 十分重要，不然会引起死循环
             try:
-                receiver_connected.send(self,
-                                        receiver_arg=receiver,
+                receiver_connected.send(self,   # sender 是Signal自己
+                                        receiver_arg=receiver,     # 下面的args 是记录的信号收发的信息，三要素：收信人，寄信人，是否要求弱引用
                                         sender_arg=sender,
                                         weak_arg=weak)
             except:
@@ -102,6 +106,7 @@ class Signal(object):
                 raise
         return receiver
 
+    # 为了区别单个sender 每个 receiver 的回应，send()函数返回的是(receiver, receiver(**kwargs) ) 元组的列表
     def send(self, *sender, **kwargs):
         """Emit this signal on behalf of *sender*, passing on \*\*kwargs.
 
@@ -146,15 +151,19 @@ class Signal(object):
             return False
         return hashable_identity(sender) in self._by_sender
 
+    # 行为像一个 property 函数，对字典 _by_senders 进行了包装
     def receivers_for(self, sender):
         """Iterate all live receivers listening for *sender*."""
         # TODO: test receivers_for(ANY)
         if self.receivers:
             sender_id = hashable_identity(sender)
             if sender_id in self._by_sender:
-                ids = (self._by_sender[ANY_ID] |
-                       self._by_sender[sender_id])
-            else:
+                ids = (self._by_sender[ANY_ID] |    # _by_sender 映射 senderid -> receiverids
+                       self._by_sender[sender_id])  # question : 这里对两个 id set做或操作意图是？
+                                                    # 每个sender 应该对应的 receivers 不应该只是明确订阅是自己的 receiver
+                                                    # 还应该包括 对应 ANY 的receivers，所以这里对 set 做了 或操作
+                                                    # ps: {1,2,3} | {2,3,4} == {1,2,3,4}
+            else:  # 对应 sender_id 不存在 _by_sender 中的情况。这种情况 可能 对应用户自己输错 sender todo
                 ids = self._by_sender[ANY_ID].copy()
             for receiver_id in ids:
                 receiver = self.receivers.get(receiver_id)
@@ -167,6 +176,7 @@ class Signal(object):
                         continue
                     receiver = strong
                 yield receiver
+                # 返回的是 正常的 强引用 类型
 
     def disconnect(self, receiver, sender=ANY):
         """Disconnect *receiver* from this signal's events."""
@@ -181,6 +191,7 @@ class Signal(object):
         if sender_id == ANY_ID:
             if self._by_receiver.pop(receiver_id, False):
                 for bucket in self._by_sender.values():
+                    # 当 sender_id 为 ANY_ID 时，有必要检查每个 sender 对应的 receivers，并从 receivers 中尝试删去 receiver_id
                     bucket.discard(receiver_id)
             self.receivers.pop(receiver_id, None)
         else:

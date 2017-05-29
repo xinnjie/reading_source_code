@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 # extracted from Louie, http://pylouie.org/
 # updated for Python 3
 #

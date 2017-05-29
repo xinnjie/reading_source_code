@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from weakref import ref
 
 from blinker._saferef import BoundMethodWeakref

@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 # extracted from Louie, http://pylouie.org/
 # updated for Python 3
 #
@@ -128,6 +130,8 @@ class BoundMethodWeakref(object):
             current.deletion_methods.append(on_delete)
             return current
         else:
+            # 调用父对象的 __new__方法返回一个实例
+            # TODO super的参数有什么用呀？ 明明只要返回MRO的下一环就就好了
             base = super(BoundMethodWeakref, cls).__new__(cls)
             cls._all_instances[key] = base
             base.__init__(target, on_delete, *arguments, **named)
@@ -170,6 +174,7 @@ class BoundMethodWeakref(object):
                                'cleanup function %s: %s' % (self, function, e))
         self.deletion_methods = [on_delete]
         self.key = self.calculate_key(target)
+        # 当target.im_self 被回收后，会调用self.deletion_methods中的所有函数，这些函数要求填入参数只有一个，且为 该对象self
         self.weak_self = weakref.ref(target.im_self, remove)
         self.weak_func = weakref.ref(target.im_func, remove)
         self.self_name = str(target.im_self)
